@@ -1,156 +1,184 @@
 package gui;
 
-import java.awt.Dimension;
-import java.awt.Toolkit;
-import java.awt.event.KeyEvent;
-
-import javax.swing.JDesktopPane;
-import javax.swing.JFrame;
-import javax.swing.JInternalFrame;
-import javax.swing.JMenu;
-import javax.swing.JMenuBar;
-import javax.swing.JMenuItem;
-import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
-import javax.swing.UnsupportedLookAndFeelException;
-
+import config.Config;
+import config.ConfigFile;
+import java.awt.*;
+import java.io.IOException;
+import java.nio.file.Paths;
 import log.Logger;
+import model.IRobot;
+import model.Robot;
+
+import javax.swing.*;
+import static java.awt.event.KeyEvent.*;
+
+import static gui.Localization.t;
+import static javax.swing.JOptionPane.*;
 
 /**
  * Что требуется сделать:
- * 1. Метод создания меню перегружен функционалом и трудно читается. 
+ * 1. Метод создания меню перегружен функционалом и трудно читается.
  * Следует разделить его на серию более простых методов (или вообще выделить отдельный класс).
- *
  */
-public class MainApplicationFrame extends JFrame
-{
+public class MainApplicationFrame extends JFrame {
     private final JDesktopPane desktopPane = new JDesktopPane();
-    
+    private final ConfigFile fileConfig;
+    private final Config config;
+
     public MainApplicationFrame() {
-        //Make the big window be indented 50 pixels from each edge
-        //of the screen.
-        int inset = 50;        
+        Localization.init(Localization.RU); // Инициализируем язык
+        // Задаём заголовок окна
+        setTitle(t("title"));
+        // Конфигурационный файл будет расположен в каталоге пользователя и будет называться
+        // robots.txt
+        // Например: C:\Users\Ekaterina\robots.txt
+        fileConfig = new ConfigFile(Paths.get(System.getProperty("user.home")).resolve("robots.txt"));
+        config = fileConfig.tryLoad();
+
+        // Большое окно должно иметь отступы по 50 пикселей с каждой стороны экрана
+        int inset = 50;
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        setBounds(inset, inset,
-            screenSize.width  - inset*2,
-            screenSize.height - inset*2);
+        setBounds(inset, inset, screenSize.width - inset * 2, screenSize.height - inset * 2);
 
         setContentPane(desktopPane);
-        
-        
-        LogWindow logWindow = createLogWindow();
-        addWindow(logWindow);
 
-        GameWindow gameWindow = new GameWindow();
-        gameWindow.setSize(400,  400);
-        addWindow(gameWindow);
+        // Создаём модель робота, которую потом отправим в 2 окна
+        IRobot robot = new Robot();
+        // Добавляем окно с журналом сообщений
+        addWindow(createLogWindow());
+        // Добавляем окно, в котором будет рисоваться робот
+        addWindow(createGameWindow(robot));
+        // Добавляем окно, в которое будем выводить параметры робота
+        addWindow(createRobotCoordWindow(robot));
 
-        setJMenuBar(generateMenuBar());
+        // Добавляем меню которое будет создано в методе genMenu()
+        setJMenuBar(genMenu());
+        // Отключаем действие при закрытии приложения, настроенное по умолчанию.
+        // Делается это вызовом:
         setDefaultCloseOperation(EXIT_ON_CLOSE);
+
+        config.loadAllWindows();
     }
-    
-    protected LogWindow createLogWindow()
-    {
-        LogWindow logWindow = new LogWindow(Logger.getDefaultLogSource());
-        logWindow.setLocation(10,10);
-        logWindow.setSize(300, 800);
-        setMinimumSize(logWindow.getSize());
-        logWindow.pack();
-        Logger.debug("Протокол работает");
-        return logWindow;
-    }
-    
-    protected void addWindow(JInternalFrame frame)
-    {
+
+
+    void addWindow(JInternalFrame frame) {
         desktopPane.add(frame);
         frame.setVisible(true);
     }
-    
-//    protected JMenuBar createMenuBar() {
-//        JMenuBar menuBar = new JMenuBar();
-// 
-//        //Set up the lone menu.
-//        JMenu menu = new JMenu("Document");
-//        menu.setMnemonic(KeyEvent.VK_D);
-//        menuBar.add(menu);
-// 
-//        //Set up the first menu item.
-//        JMenuItem menuItem = new JMenuItem("New");
-//        menuItem.setMnemonic(KeyEvent.VK_N);
-//        menuItem.setAccelerator(KeyStroke.getKeyStroke(
-//                KeyEvent.VK_N, ActionEvent.ALT_MASK));
-//        menuItem.setActionCommand("new");
-////        menuItem.addActionListener(this);
-//        menu.add(menuItem);
-// 
-//        //Set up the second menu item.
-//        menuItem = new JMenuItem("Quit");
-//        menuItem.setMnemonic(KeyEvent.VK_Q);
-//        menuItem.setAccelerator(KeyStroke.getKeyStroke(
-//                KeyEvent.VK_Q, ActionEvent.ALT_MASK));
-//        menuItem.setActionCommand("quit");
-////        menuItem.addActionListener(this);
-//        menu.add(menuItem);
-// 
-//        return menuBar;
-//    }
-    
-    private JMenuBar generateMenuBar()
-    {
-        JMenuBar menuBar = new JMenuBar();
-        
-        JMenu lookAndFeelMenu = new JMenu("Режим отображения");
-        lookAndFeelMenu.setMnemonic(KeyEvent.VK_V);
-        lookAndFeelMenu.getAccessibleContext().setAccessibleDescription(
-                "Управление режимом отображения приложения");
-        
-        {
-            JMenuItem systemLookAndFeel = new JMenuItem("Системная схема", KeyEvent.VK_S);
-            systemLookAndFeel.addActionListener((event) -> {
-                setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-                this.invalidate();
-            });
-            lookAndFeelMenu.add(systemLookAndFeel);
-        }
 
-        {
-            JMenuItem crossplatformLookAndFeel = new JMenuItem("Универсальная схема", KeyEvent.VK_S);
-            crossplatformLookAndFeel.addActionListener((event) -> {
-                setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
-                this.invalidate();
-            });
-            lookAndFeelMenu.add(crossplatformLookAndFeel);
-        }
-
-        JMenu testMenu = new JMenu("Тесты");
-        testMenu.setMnemonic(KeyEvent.VK_T);
-        testMenu.getAccessibleContext().setAccessibleDescription(
-                "Тестовые команды");
-        
-        {
-            JMenuItem addLogMessageItem = new JMenuItem("Сообщение в лог", KeyEvent.VK_S);
-            addLogMessageItem.addActionListener((event) -> {
-                Logger.debug("Новая строка");
-            });
-            testMenu.add(addLogMessageItem);
-        }
-
-        menuBar.add(lookAndFeelMenu);
-        menuBar.add(testMenu);
-        return menuBar;
+    LogWindow createLogWindow() { // Создание окна для вывода журнала сообщений
+        // Создаём окно и передаём ему общее хранилище сообщений
+        LogWindow w = new LogWindow(Logger.getDefaultLogSource());
+        // Указываем координаты верхнего левого угла окна
+        w.setLocation(10, 10);
+        // Указываем начальный размер окна
+        w.setSize(300, 800);
+        // Указываем что нельзя его уменьшать меньше начального размера
+        setMinimumSize(w.getSize());
+        // Упаковываем все вложенные компоненты (они при этом выравниваются внутри как мы задали)
+        w.pack();
+        // Регистрируем в конфигурации приложения
+        config.register(w, "log");
+        // Отпавляем первое сообщение в журнал работы чтобы проверить что он работает
+        Logger.debug("Протокол работает");
+        return w;
     }
-    
-    private void setLookAndFeel(String className)
-    {
-        try
-        {
+
+    private GameWindow createGameWindow(IRobot robot) {
+        GameWindow w = new GameWindow(robot);
+        w.setSize(400, 400);
+        config.register(w, "model");
+        return w;
+    }
+
+    private RobotCoordWindow createRobotCoordWindow(IRobot robot) {
+        RobotCoordWindow w = new RobotCoordWindow(robot);
+        w.setSize(200, 100);
+        config.register(w, "coordinates");
+        return w;
+    }
+
+    // Создание главного меню приложения
+    private JMenuBar genMenu() {
+        JMenuBar m = new JMenuBar(); // Создаём меню для нашей программы
+        // Создаём выпадающее меню с внешним видом программы
+        m.add(subMenu("Режим отображения", VK_V, "Управление режимом отображения приложения",
+                menu("Системная схема", VK_S, () -> {
+                    setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+                    this.invalidate();
+                }),
+                menu("Универсальная схема", VK_U, () -> {
+                    setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
+                    this.invalidate();
+                })
+        ));
+        // Создаём выпадающее меню для тестирования
+        m.add(subMenu("Тесты", VK_T, "Тестовые команды",
+                menu("Сообщение в лог", VK_S, () -> Logger.debug("Новая строка")),
+                menu("Привет!", VK_K, () -> Logger.debug("Привет всем!"))
+        ));
+        m.add(subMenu("Язык", VK_L, "Выбор языка интерфейса",
+                menu("Русский", VK_R, () -> lang(Localization.RU)),
+                menu("Translit", VK_T, () -> lang(Localization.TRANSLIT))
+        ));
+        // 1. Добавить пункт меню, позволяющий закрыть приложение и сделать так,
+        // чтобы в методе выдавался запрос на подтверждение выхода (класс JOptionPane)
+        // Добавляем пункт меню "Выход" в общее меню
+        m.add(menu("Выход из программы", VK_ESCAPE, () -> {
+            if (JOptionPane.showConfirmDialog(this, // Родительское окно
+                    "Выйти из приложения?", // Сообщение в окне
+                    "Подтверждение выхода", // Заголовок окна
+                    YES_NO_OPTION // Какие кнопки
+            ) == YES_OPTION) {
+                saveConfig();
+                this.dispose(); // Закрываем основное окно
+                System.exit(0); // Закрываем программу
+            } else {
+                Logger.debug("При подтверждении выхода вы нажали НЕТ или закрыли окно");
+            }
+        }));
+        return m;
+    }
+
+    // Создание подменю в основном меню программы
+    private JMenu subMenu(String s, int hotKey, String description, JMenuItem... items) {
+        JMenu m = new JMenu(t(s)); // Создаём подменю
+        m.setMnemonic(hotKey); // Задаём "горячую" кнопку для запуска
+        m.getAccessibleContext().setAccessibleDescription(t(description)); // Задаём описание
+        for (JMenuItem x : items) m.add(x); // Добавляем пункты меню
+        return m; // Возвращаем подменю
+    }
+
+    private JMenuItem menu(String s, int hotKey, Runnable action) {
+        JMenuItem mi = new JMenuItem(t(s), hotKey); // Создаём пункт меню с текстом и "горячей" кнопкой
+        //mi.setAccelerator(KeyStroke.getKeyStroke(hotKey, ALT_MASK));
+        //mi.setActionCommand("new");
+        // Добавляем обработчик события (событие - нажатие на пункт меню)
+        mi.addActionListener(event -> action.run());
+        return mi;
+    }
+
+    private void setLookAndFeel(String className) {
+        try {
             UIManager.setLookAndFeel(className);
             SwingUtilities.updateComponentTreeUI(this);
-        }
-        catch (ClassNotFoundException | InstantiationException
-            | IllegalAccessException | UnsupportedLookAndFeelException e)
-        {
+        } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {
             // just ignore
+        }
+    }
+
+    private void lang(Localization local) {
+        Logger.debug("Выбран язык: " + local.toString());
+        Localization.init(local);
+        this.invalidate();
+    }
+
+    void saveConfig() {
+        config.saveAllWindows();
+        try {
+            fileConfig.save(config);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 }
